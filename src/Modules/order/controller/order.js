@@ -2,15 +2,10 @@ import { couponModel } from "../../../../DB/models/coupon.model.js";
 import { orderModel } from "../../../../DB/models/order.model.js";
 import { productModel } from "../../../../DB/models/product.model.js";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
-import { createInvoice } from "../../../utils/createInvoice.js";
-import {fileURLToPath} from 'url'
-import path from 'path'
-import { sendEmail } from "../../../utils/sendEmails.js";
-import { clearCart, updateStock } from "../order.service.js";
-import cloudinary from "../../../utils/cloud.js";
+import { completeOrder, updateStock } from "../order.service.js";
 import { cartModel } from "../../../../DB/models/cart.model.js";
 import Stripe from "stripe";
-const __dirname=path.dirname(fileURLToPath(import.meta.url))
+
 // create order
 export const createOrder=asyncHandler(async(req,res,next)=>{
     const{payment,coupon , address , phone}=req.body
@@ -21,7 +16,7 @@ export const createOrder=asyncHandler(async(req,res,next)=>{
     {
          checkCoupon=await couponModel.findOne({name:coupon , expiredAt:{$gt:Date.now()}})
 
-        if(!coupon)return next(new Error("In-valid coupon!"))
+        if(!checkCoupon)return next(new Error("In-valid coupon!"))
 
     }
     // check cart
@@ -69,54 +64,9 @@ export const createOrder=asyncHandler(async(req,res,next)=>{
             discount:checkCoupon?.discount
         },
         price:orderPrice,
-        payment
+        payment,
 
     })
-    // generate invoice
-    const user=req.user
-    const invoice = {
-        shipping: {
-          name: user.userName,
-          address: order.address,
-          country: "Egypt",
-        },
-        items:order.product,   
-        subtotal:order.price,
-        paid:order.finalPrice,
-        invoice_nr:order._id
-
-    };
-
-
-    const pdfPath= path.join(__dirname,`./../../../../invoiceTemp/${order._id}.pdf`)
-
-    createInvoice(invoice , pdfPath)
-
-    // upload Cloudinary
-    const {public_id,secure_url} = await cloudinary.uploader.upload(pdfPath,{
-        folder:`${process.env.FOLDER_CLOUD_NAME}/order/invoice/${user._id}`
-    })
-
-    // add invoice to order
-    order.invoice={id:public_id , url:secure_url};
-    await order.save()
-
-    // send email
-    const isSent=await sendEmail({to:user.email , subject:"Order invoice",attachments:[{
-        path:secure_url,
-        contentType:"application/pdf",
-    }]})
-
-    if(isSent)
-    {
-        // update stock
-        updateStock(order.product , true)
-        // clear cart
-        clearCart(user._id)
-
-    }
-
-
 
     // stripe payment
     if(payment == "visa")
@@ -152,12 +102,19 @@ export const createOrder=asyncHandler(async(req,res,next)=>{
                  quantity:productt.quantity
             }
         }),
+
+        
         discounts: existCoupon ? [{coupon:existCoupon.id}] : [],
+        // discounts: existCoupon ? [{coupon:existCoupon.id}] : [],
     })
 
     return res.json({success:true , results:session.url})
 
     }
+
+
+    await completeOrder(order);
+
 
     return res.json({success:true , message:"order placed successfully! please check your email"})
 
@@ -170,8 +127,10 @@ export const createOrder=asyncHandler(async(req,res,next)=>{
 export const cancelOrder=asyncHandler(async(req,res,next)=>{
     const order=await orderModel.findById(req.params.orderId)
     if(!order) return next(new Error("order not found !"))
+        
     if(order.status === "shipped" || order.status === "delivered")
-    return next(new Error("can not cancel order !"))
+        return next(new Error("can not cancel order !"))
+
     order.status = "canceled"
     await order.save()
     updateStock(order.product , false)
@@ -183,6 +142,7 @@ export const cancelOrder=asyncHandler(async(req,res,next)=>{
 
 // webhoock
 export const orderWebhook=asyncHandler(async(request, response) => {
+    console.log("start");
     const stripe=new Stripe(process.env.STRIPE_KEY)
   const sig = request.headers['stripe-signature'];
   let event;
@@ -196,16 +156,22 @@ export const orderWebhook=asyncHandler(async(request, response) => {
 
   // Handle the event
   const orderId=event.data.object.metadata.order_id
+    const order = await orderModel.findById(orderId);
 
 if(event.type === 'checkout.session.completed')
 {
     // change order status ???
     await orderModel.findOneAndUpdate({_id:orderId} , {status:"visa payed"})
-    return
+
+    await completeOrder(order);
+
+    return response.json({message:"Done"})
+
 }
 
 await orderModel.findOneAndUpdate({_id:orderId} , {status:"failed to pay"})
-return
+
+return response.json({message:"Failed"})
 
 }
 
