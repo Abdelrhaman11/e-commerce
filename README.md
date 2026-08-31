@@ -102,4 +102,4 @@ The API includes endpoints for:
 
 Abdelrahman Khaled Hamed
 
-Backend / Full Stack Developer
+Backend  /  Full Stack Developer
