@@ -21,7 +21,9 @@ createdBy:{type:Types.ObjectId , ref:"User" , required:true},
 category:{type:Types.ObjectId , ref:"Category",required:true},
 subcategory:{type:Types.ObjectId , ref:"Subcategory",required:true},
 brand:{type:Types.ObjectId , ref:"Brand",required:true},
-cloudFolder:{type:String , unique:true, required:true}
+cloudFolder:{type:String , unique:true, required:true},
+reservedStock: {type: Number,default: 0,min: 0},
+
 
 
 },

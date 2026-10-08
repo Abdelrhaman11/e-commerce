@@ -31,14 +31,21 @@ const orderSchema=new Schema({
     },
     status:{
         type:String,
-        enum:['placed' , 'shipped' , 'delivered' , 'canceled' , 'refunded','visa payed','failed to pay'],
+        enum:['placed' , 'shipped' , 'delivered' , 'canceled' , 'refunded','pending_payment','canceled'],
         default:'placed'
     },
     payment:{
         type:String,
         enum:['visa' , 'cash'],
         default:'cash'
-    }  
+    }  ,
+            paymentSessionId: {
+            type: String
+        },
+
+        paymentSessionUrl: {
+            type: String
+        },
 },{
     timestamps:true , strictQuery:true , toJSON:{virtuals:true} , toObject:{virtuals:true}
 })

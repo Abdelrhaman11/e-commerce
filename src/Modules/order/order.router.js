@@ -9,6 +9,9 @@ const router=Router();
 // create order
 router.post("/" , isAuthenticated , isValid(validator.createOrderSchema),controllerOrder.createOrder)
 
+router.post('/:orderId',isAuthenticated,isValid(validator.payOrderSchema) ,controllerOrder.createPaymentSession )
+
+
 // cancel order
 router.patch('/:orderId',isAuthenticated,isValid(validator.cancelOrderSchema) ,controllerOrder.cancelOrder )
 

@@ -12,3 +12,7 @@ export const cancelOrderSchema=joi.object({
     orderId:joi.string().custom(isValidObjectId).required()
 }).required()
 
+export const payOrderSchema=joi.object({
+    orderId:joi.string().custom(isValidObjectId).required()
+}).required()
+
